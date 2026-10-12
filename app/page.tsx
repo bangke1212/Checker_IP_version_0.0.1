@@ -14,9 +14,8 @@ type CheckResult = {
     connection?: { isp?: string; org?: string; asn?: number; type?: string };
   } | null;
   blacklists: { name: string; listed: boolean; status: string }[];
-  endpointChecks: { name: string; ok: boolean; status: number; latencyMs: number }[];
   score: number;
-  status: "healthy" | "degraded" | "review";
+  status: "healthy" | "review";
   source?: "client" | "manual";
   caveat: string;
 };
@@ -25,7 +24,6 @@ type SpeedResult = { mbps: number; latencyMs: number; bytes: number };
 
 const STATUS_LABELS = {
   healthy: "HEALTHY",
-  degraded: "DEGRADED",
   review: "REVIEW",
 };
 
@@ -156,11 +154,6 @@ export default function Home() {
           <p className="muted">A lightweight client-side download test. This measures the browser connection, not a Vercel server IP.</p>
           <button className="secondary-button" onClick={runSpeedTest} disabled={speedLoading}>{speedLoading ? "Testing…" : "Run speed probe"}</button>
         </div>
-      </section>
-
-      <section className="panel endpoint-panel">
-        <div className="panel-header"><div><p className="eyebrow">SERVICE REACHABILITY</p><h2>Endpoint heartbeat</h2></div><span className="muted">Server-side probe</span></div>
-        <div className="endpoint-list">{(result?.endpointChecks || []).map((endpoint) => <div className="endpoint" key={endpoint.name}><span className={`endpoint-status ${endpoint.ok ? "up" : "down"}`} /><span>{endpoint.name.replace("https://", "")}</span><strong>{endpoint.ok ? `${endpoint.status} · ${endpoint.latencyMs} ms` : "OFFLINE"}</strong></div>)}</div>
       </section>
 
       <footer><span>IP/SENTINEL · PUBLIC SIGNALS ONLY</span><span>IP data is checked live and not persisted by this demo.</span></footer>

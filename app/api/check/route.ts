@@ -4,11 +4,6 @@ import dns from "node:dns/promises";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TARGETS = [
-  { name: "DAWN website", url: "https://dawninternet.com/" },
-  { name: "DAWN dashboard", url: "https://dashboard.dawninternet.com/" },
-];
-
 const DNSBLS = [
   { name: "SpamCop", zone: "bl.spamcop.net" },
   { name: "DroneBL", zone: "dnsbl.dronebl.org" },
@@ -50,32 +45,6 @@ async function lookupBlacklist(ip: string, zone: string) {
   }
 }
 
-async function timedFetch(url: string) {
-  const started = performance.now();
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-      headers: { "user-agent": "IP-Sentinel/0.0.1" },
-    });
-    return {
-      name: url,
-      ok: response.ok || response.status < 500,
-      status: response.status,
-      latencyMs: Math.round(performance.now() - started),
-    };
-  } catch {
-    return {
-      name: url,
-      ok: false,
-      status: 0,
-      latencyMs: Math.round(performance.now() - started),
-    };
-  }
-}
-
 export async function GET(request: NextRequest) {
   const requestedIp = request.nextUrl.searchParams.get("ip")?.trim();
   const clientIp = requestedIp || getClientIp(request);
@@ -91,19 +60,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [geoResponse, reverseDns, blacklists, endpointChecks] = await Promise.all([
+  const [geoResponse, reverseDns, blacklists] = await Promise.all([
     fetch(`https://ipwho.is/${encodeURIComponent(clientIp)}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     }).then((response) => response.json()).catch(() => null),
     dns.reverse(clientIp).then((items) => items[0] || null).catch(() => null),
     Promise.all(DNSBLS.map((entry) => lookupBlacklist(clientIp, entry.zone))),
-    Promise.all(TARGETS.map((target) => timedFetch(target.url))),
   ]);
 
   const listed = blacklists.filter((item) => item.status === "checked" && item.listed).length;
-  const failedEndpoints = endpointChecks.filter((item) => !item.ok).length;
-  const score = Math.max(0, 100 - listed * 35 - failedEndpoints * 15);
+  const score = Math.max(0, 100 - listed * 35);
 
   return NextResponse.json({
     checkedAt: new Date().toISOString(),
@@ -111,11 +78,10 @@ export async function GET(request: NextRequest) {
     reverseDns,
     geo: geoResponse?.success === false ? null : geoResponse,
     blacklists,
-    endpointChecks,
     score,
-    status: listed > 0 ? "review" : failedEndpoints > 0 ? "degraded" : "healthy",
+    status: listed > 0 ? "review" : "healthy",
     source: requestedIp ? "manual" : "client",
     caveat:
-      "Hasil ini memeriksa reputasi publik dan konektivitas dari sisi layanan. Ini bukan pemeriksaan internal DAWN dan tidak menjamin kelayakan reward.",
+      "Hasil ini berdasarkan reputasi publik IP dan tidak menjamin kelayakan pada layanan pihak ketiga.",
   });
 }
