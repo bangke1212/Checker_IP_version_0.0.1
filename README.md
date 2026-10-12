@@ -1,12 +1,13 @@
 # IP/Sentinel DApp
 
-IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik IP yang terlihat oleh request ke aplikasi. Aplikasi ini menampilkan IP publik, ASN/provider, reverse DNS, pemeriksaan DNSBL publik, dan browser speed probe.
+IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik IP yang terlihat oleh request ke aplikasi. Aplikasi ini menampilkan IP publik, ASN/provider, estimasi tipe jaringan, reverse DNS, pemeriksaan DNSBL publik, dan browser speed probe.
 
 ## Fitur
 
 - Live polling setiap 30 detik.
 - Health score 0–100 berbasis sinyal publik.
 - Deteksi lokasi dan provider melalui IPWho.is.
+- Estimasi tipe IP **Residential**, **Mobile**, **Datacenter**, atau **Unknown** beserta tingkat keyakinannya.
 - Reverse DNS melalui resolver server.
 - Pemeriksaan SpamCop dan DroneBL melalui DNSBL.
 - Form **Check a proxy IP** untuk memeriksa IPv4 proxy publik secara manual.
@@ -53,6 +54,8 @@ IP yang masuk blacklist publik diberi status `REVIEW`. Hasil `HEALTHY` berarti s
 Demo ini tidak memiliki database dan tidak menyimpan IP di server aplikasi. Provider eksternal yang dipanggil dapat memiliki kebijakan log mereka sendiri. IP mentah tidak ditulis ke blockchain. Hasil publik juga tidak dapat mengetahui internal risk flag, histori akun, atau keterkaitan IP dengan kredensial DAWN.
 
 DNSBL bukan sumber kebenaran tunggal. False positive, rate limit, resolver failure, dan perbedaan reputasi antar-provider tetap mungkin terjadi.
+
+Tipe IP adalah estimasi dari metadata koneksi/provider yang tersedia. Nilai `Unknown` berarti sumber data belum memberi sinyal yang cukup; kategori tersebut bukan verifikasi pasti jenis koneksi fisik.
 
 ## Struktur
 

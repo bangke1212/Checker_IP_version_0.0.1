@@ -45,6 +45,25 @@ async function lookupBlacklist(ip: string, zone: string) {
   }
 }
 
+function classifyIpType(connectionType?: string, provider = "") {
+  const explicitType = connectionType?.trim().toLowerCase() || "";
+  const providerText = provider.trim().toLowerCase();
+  const sourceType = explicitType || providerText;
+
+  if (/\b(cellular|mobile|wireless|lte|5g)\b/.test(sourceType)) {
+    return { category: "Mobile" as const, confidence: explicitType ? "high" as const : "medium" as const };
+  }
+  if (/\b(residential|cable|dsl|broadband|fiber)\b/.test(sourceType)) {
+    return { category: "Residential" as const, confidence: explicitType ? "high" as const : "medium" as const };
+  }
+  if (/\b(data\s*center|datacenter|hosting|cloud|vps)\b/.test(sourceType) ||
+      /\b(amazon data services|aws|google cloud|microsoft azure|digitalocean|oracle cloud|linode|vultr|hetzner|ovhcloud)\b/.test(providerText)) {
+    return { category: "Datacenter" as const, confidence: explicitType ? "high" as const : "medium" as const };
+  }
+
+  return { category: "Unknown" as const, confidence: "low" as const };
+}
+
 export async function GET(request: NextRequest) {
   const requestedIp = request.nextUrl.searchParams.get("ip")?.trim();
   const clientIp = requestedIp || getClientIp(request);
@@ -69,6 +88,8 @@ export async function GET(request: NextRequest) {
     Promise.all(DNSBLS.map((entry) => lookupBlacklist(clientIp, entry.zone))),
   ]);
 
+  const connection = geoResponse?.success === false ? null : geoResponse?.connection;
+  const ipType = classifyIpType(connection?.type, `${connection?.org || ""} ${connection?.isp || ""}`);
   const listed = blacklists.filter((item) => item.status === "checked" && item.listed).length;
   const score = Math.max(0, 100 - listed * 35);
 
@@ -78,6 +99,7 @@ export async function GET(request: NextRequest) {
     reverseDns,
     geo: geoResponse?.success === false ? null : geoResponse,
     blacklists,
+    ipType,
     score,
     status: listed > 0 ? "review" : "healthy",
     source: requestedIp ? "manual" : "client",
