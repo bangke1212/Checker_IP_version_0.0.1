@@ -12,7 +12,6 @@ IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik dan konektivit
 - Pemeriksaan HTTPS ke `dawninternet.com` dan `dashboard.dawninternet.com`.
 - Form **Check a proxy IP** untuk memeriksa IPv4 proxy publik secara manual.
 - Tes speed ringan dari browser melalui Cloudflare Speed endpoint.
-- Connect wallet opsional untuk identitas sesi. Tidak ada data IP yang ditulis ke blockchain.
 - Tidak meminta password, cookie, token, seed phrase, atau kredensial DAWN.
 
 ## Jalankan lokal

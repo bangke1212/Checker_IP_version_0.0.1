@@ -36,7 +36,6 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [speed, setSpeed] = useState<SpeedResult | null>(null);
   const [speedLoading, setSpeedLoading] = useState(false);
-  const [wallet, setWallet] = useState("");
   const [manualIp, setManualIp] = useState("");
   const [targetIp, setTargetIp] = useState("");
 
@@ -83,20 +82,6 @@ export default function Home() {
     }
   };
 
-  const connectWallet = async () => {
-    const ethereum = (window as Window & { ethereum?: { request: (args: { method: string }) => Promise<string[]> } }).ethereum;
-    if (!ethereum) {
-      setError("Wallet EVM tidak ditemukan. Dashboard tetap dapat digunakan tanpa wallet.");
-      return;
-    }
-    try {
-      const accounts = await ethereum.request({ method: "eth_requestAccounts" });
-      setWallet(accounts[0] || "");
-    } catch {
-      setError("Koneksi wallet dibatalkan.");
-    }
-  };
-
   const location = useMemo(() => {
     if (!result?.geo) return "Location unavailable";
     return [result.geo.city, result.geo.region, result.geo.country].filter(Boolean).join(", ");
@@ -110,7 +95,6 @@ export default function Home() {
         <div className="brand"><span className="brand-mark">◌</span><span>IP<span className="accent">/</span>SENTINEL</span></div>
         <div className="nav-actions">
           <span className="live-pill"><span className="pulse" /> LIVE CHECKS</span>
-          <button className="wallet-button" onClick={connectWallet}>{wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : "Connect wallet"}</button>
         </div>
       </nav>
 
