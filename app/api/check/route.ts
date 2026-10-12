@@ -20,6 +20,15 @@ function getClientIp(request: NextRequest) {
   return forwarded || real || "unknown";
 }
 
+function isPublicIpv4(ip: string) {
+  const parts = ip.split(".");
+  return parts.length === 4 && parts.every((part) => {
+    if (!/^\d{1,3}$/.test(part)) return false;
+    const value = Number(part);
+    return value >= 0 && value <= 255;
+  });
+}
+
 function reverseIp(ip: string) {
   return ip.split(".").reverse().join(".");
 }
@@ -68,13 +77,15 @@ async function timedFetch(url: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const clientIp = getClientIp(request);
+  const requestedIp = request.nextUrl.searchParams.get("ip")?.trim();
+  const clientIp = requestedIp || getClientIp(request);
 
-  if (clientIp === "unknown" || clientIp.includes(":")) {
+  if (clientIp === "unknown" || !isPublicIpv4(clientIp)) {
     return NextResponse.json(
       {
-        error:
-          "IPv4 client tidak terdeteksi. Vercel atau jaringan Anda mungkin hanya meneruskan IPv6/proxy.",
+        error: requestedIp
+          ? "Masukkan IPv4 publik yang valid, contoh 203.0.113.10. Jangan masukkan user/password proxy."
+          : "IPv4 client tidak terdeteksi. Vercel atau jaringan Anda mungkin hanya meneruskan IPv6/proxy.",
       },
       { status: 400 },
     );
@@ -103,6 +114,7 @@ export async function GET(request: NextRequest) {
     endpointChecks,
     score,
     status: listed > 0 ? "review" : failedEndpoints > 0 ? "degraded" : "healthy",
+    source: requestedIp ? "manual" : "client",
     caveat:
       "Hasil ini memeriksa reputasi publik dan konektivitas dari sisi layanan. Ini bukan pemeriksaan internal DAWN dan tidak menjamin kelayakan reward.",
   });

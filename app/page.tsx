@@ -17,6 +17,7 @@ type CheckResult = {
   endpointChecks: { name: string; ok: boolean; status: number; latencyMs: number }[];
   score: number;
   status: "healthy" | "degraded" | "review";
+  source?: "client" | "manual";
   caveat: string;
 };
 
@@ -36,12 +37,15 @@ export default function Home() {
   const [speed, setSpeed] = useState<SpeedResult | null>(null);
   const [speedLoading, setSpeedLoading] = useState(false);
   const [wallet, setWallet] = useState("");
+  const [manualIp, setManualIp] = useState("");
+  const [targetIp, setTargetIp] = useState("");
 
   const checkIp = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/check?ts=${Date.now()}`, { cache: "no-store" });
+      const query = targetIp ? `&ip=${encodeURIComponent(targetIp)}` : "";
+      const response = await fetch(`/api/check?ts=${Date.now()}${query}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "IP check failed");
       setResult(data);
@@ -51,7 +55,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [targetIp]);
 
   useEffect(() => {
     checkIp();
@@ -125,6 +129,19 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="manual-check panel">
+        <div>
+          <p className="eyebrow">OPTIONAL TARGET</p>
+          <h2>Check a proxy IP</h2>
+          <p className="muted">Enter a public IPv4 to scan its public reputation. The tool does not connect through the proxy and never asks for proxy credentials.</p>
+        </div>
+        <form className="manual-form" onSubmit={(event) => { event.preventDefault(); setTargetIp(manualIp.trim()); }}>
+          <input value={manualIp} onChange={(event) => setManualIp(event.target.value)} placeholder="203.0.113.10" inputMode="decimal" aria-label="Public proxy IPv4" />
+          <button className="secondary-button" type="submit">Scan IP ↗</button>
+          {targetIp && <button className="text-button" type="button" onClick={() => { setManualIp(""); setTargetIp(""); }}>Use my IP</button>}
+        </form>
+      </section>
+
       {error && <div className="notice error">{error}</div>}
 
       <section className="metrics-grid">
@@ -141,7 +158,7 @@ export default function Home() {
 
       <section className="content-grid">
         <div className="panel signals-panel">
-          <div className="panel-header"><div><p className="eyebrow">SIGNAL MATRIX</p><h2>Reputation signals</h2></div><span className="timestamp">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Awaiting data"}</span></div>
+          <div className="panel-header"><div><p className="eyebrow">SIGNAL MATRIX</p><h2>Reputation signals</h2></div><span className="timestamp">{lastUpdated ? `${result?.source === "manual" ? "Proxy IP · " : "Live IP · "}${lastUpdated.toLocaleTimeString()}` : "Awaiting data"}</span></div>
           <div className="signal-list">
             {(result?.blacklists || [{ name: "Public DNSBLs", listed: false, status: "pending" }]).map((item) => <Signal key={item.name} name={item.name} value={item.status === "unavailable" ? "UNAVAILABLE" : item.listed ? "LISTED" : item.status === "pending" ? "PENDING" : "CLEAN"} bad={item.listed} />)}
             <Signal name="ASN / Provider" value={result?.geo?.connection?.org || "PENDING"} />

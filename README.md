@@ -10,6 +10,7 @@ IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik dan konektivit
 - Reverse DNS melalui resolver server.
 - Pemeriksaan SpamCop dan DroneBL melalui DNSBL.
 - Pemeriksaan HTTPS ke `dawninternet.com` dan `dashboard.dawninternet.com`.
+- Form **Check a proxy IP** untuk memeriksa IPv4 proxy publik secara manual.
 - Tes speed ringan dari browser melalui Cloudflare Speed endpoint.
 - Connect wallet opsional untuk identitas sesi. Tidak ada data IP yang ditulis ke blockchain.
 - Tidak meminta password, cookie, token, seed phrase, atau kredensial DAWN.
@@ -44,6 +45,8 @@ Jika repository masih menggunakan nama lama atau project berada di GitHub lain, 
 ## Cara membaca hasil
 
 `IP/Sentinel` memeriksa IP client yang diteruskan oleh header `x-forwarded-for` atau `x-real-ip`. Pada Vercel, ini biasanya adalah IP pengunjung yang terlihat oleh edge proxy. Pemeriksaan endpoint dan metadata IP dilakukan oleh serverless function Vercel, sehingga status tersebut bukan pengukuran dari mesin internal DAWN.
+
+Untuk memeriksa proxy, masukkan **IP publik IPv4 saja** pada form `Check a proxy IP`. Tool memeriksa metadata, reverse DNS, dan DNSBL untuk IP tersebut. Tool **tidak menghubungkan request melalui proxy**, tidak menguji username/password proxy, dan tidak menerima kredensial proxy.
 
 IP yang masuk blacklist publik diberi status `REVIEW`. Endpoint yang gagal diberi status `DEGRADED`. Hasil `HEALTHY` berarti sinyal publik yang diperiksa saat itu terlihat normal; hasil ini **bukan jaminan** bahwa IP diterima oleh sistem internal DAWN atau bahwa akun/reward DAWN akan memenuhi syarat.
 
