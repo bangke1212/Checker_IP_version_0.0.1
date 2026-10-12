@@ -229,6 +229,7 @@ export default function Home() {
             <DetailRow label="Coordinates" value={formatCoordinates(result?.geo?.latitude, result?.geo?.longitude)} />
             <DetailRow label="Time zone" value={result?.geo?.timezone?.id || "Unavailable"} />
           </div>
+          <p className="geo-accuracy-note">Estimated from IP, not GPS. This may point to an ISP area, not a home or street; the GeoIP source provides no accuracy radius.</p>
         </article>
 
         <article className="panel org-panel">
@@ -320,7 +321,7 @@ export default function Home() {
 
       <footer className="footer">
         <span className="footer-brand">IP<span>/</span>SENTINEL</span>
-        <span>Public signals only · IP data is not persisted by this demo.</span>
+        <span>Public signals only · IP scan history is not stored.</span>
         <span className="footer-live"><span />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Awaiting first check"}</span>
       </footer>
     </main>
@@ -356,7 +357,7 @@ function formatBlacklistName(name: string) {
 
 function formatCoordinates(latitude?: number, longitude?: number) {
   if (typeof latitude !== "number" || typeof longitude !== "number") return "Unavailable";
-  return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+  return `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
 }
 
 function buildSparkline(values: number[]) {

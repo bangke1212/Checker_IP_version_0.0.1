@@ -1,11 +1,55 @@
 "use client";
 
+import { useState } from "react";
 import type { FormEventHandler, ReactNode } from "react";
 import type { CheckResult, SpeedResult } from "./types";
 
 type SectionProps = { result: CheckResult | null };
+type ApproximateArea = {
+  areaLabel: string | null;
+  neighborhood: string | null;
+  locality: string | null;
+  region: string | null;
+  country: string | null;
+  accuracyRadiusMeters: null;
+  coordinateRounding: string;
+  source: string;
+  attributionUrl: string;
+};
+type AreaLookupState = { key: string; loading: boolean; area: ApproximateArea | null; error: string };
 
 export function IntelligenceSection({ result }: SectionProps) {
+  const [areaLookupState, setAreaLookupState] = useState<AreaLookupState | null>(null);
+  const latitude = result?.geo?.latitude;
+  const longitude = result?.geo?.longitude;
+  const areaLookupKey = result && typeof latitude === "number" && typeof longitude === "number"
+    ? `${result.clientIp}:${latitude}:${longitude}`
+    : "";
+  const currentAreaLookup = areaLookupState?.key === areaLookupKey ? areaLookupState : null;
+
+  const lookupNearestArea = async () => {
+    if (!areaLookupKey || typeof latitude !== "number" || typeof longitude !== "number") return;
+    const key = areaLookupKey;
+    setAreaLookupState({ key, loading: true, area: null, error: "" });
+    try {
+      const response = await fetch("/api/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latitude, longitude }),
+      });
+      const payload = await response.json() as { area?: ApproximateArea; error?: string };
+      if (!response.ok || !payload.area) throw new Error(payload.error || "Area lookup is unavailable.");
+      setAreaLookupState({ key, loading: false, area: payload.area, error: "" });
+    } catch (error) {
+      setAreaLookupState({
+        key,
+        loading: false,
+        area: null,
+        error: error instanceof Error ? error.message : "Area lookup is unavailable.",
+      });
+    }
+  };
+
   if (!result) {
     return <SectionFrame eyebrow="IP INTELLIGENCE" title="Detailed IP analysis" description="Inspect the network, location and reputation signals for the IP currently selected in the dashboard.">
       <EmptyState title="Waiting for an IP result" description="The dashboard is checking the current network IP. You can also enter an IPv4 address in the search bar above." />
@@ -33,6 +77,22 @@ export function IntelligenceSection({ result }: SectionProps) {
         <DataRow label="Organization" value={result.geo?.connection?.org || "Unavailable"} />
         <DataRow label="Network / ISP" value={result.geo?.connection?.isp || "Unavailable"} />
         <DataRow label="IP category" value={`${result.ipType.category} · ${result.ipType.confidence} confidence`} />
+        <div className="location-accuracy" role="note">
+          <strong>IP-based estimate · not GPS</strong>
+          <span>This may identify an ISP or nearby area, not a customer’s home or street. The GeoIP source provides no accuracy radius.</span>
+        </div>
+        <div className="area-lookup">
+          <button className="button-secondary" type="button" onClick={lookupNearestArea} disabled={!areaLookupKey || Boolean(currentAreaLookup?.loading)}>
+            {currentAreaLookup?.loading ? "Looking up nearby area…" : currentAreaLookup?.area ? "Area lookup complete" : "Look up nearest mapped area"}
+          </button>
+          {currentAreaLookup?.error && <p className="area-lookup-error" role="alert">{currentAreaLookup.error}</p>}
+          {currentAreaLookup?.area && <div className="area-result" aria-live="polite">
+            <span className="data-label">NEAREST MAPPED AREA · APPROXIMATE</span>
+            <strong>{currentAreaLookup.area.areaLabel || "No nearby area label available"}</strong>
+            <p>Coordinates were rounded to 0.01° before lookup. No street, house number, or accuracy radius is provided.</p>
+            <a href={currentAreaLookup.area.attributionUrl} target="_blank" rel="noreferrer">Data © OpenStreetMap contributors</a>
+          </div>}
+        </div>
       </article>
 
       <article className="section-card">
@@ -157,9 +217,9 @@ export function PrivacySection() {
   return <SectionFrame eyebrow="PRIVACY" title="What happens to your scan" description="A plain-language summary of what this demo checks, which services receive a lookup, and what the application does not store.">
     <div className="privacy-intro"><strong>IP checks require processing the address being checked.</strong><span>The dashboard does not promise that a scan is anonymous: network providers and the hosting platform may process request data under their own policies.</span></div>
     <div className="section-card-grid privacy-grid">
-      <article className="section-card"><CardHeading eyebrow="01 · INPUT" title="Which IP is checked?" /><p className="section-copy">By default, the server checks the IPv4 address forwarded for the current request. If you enter an IPv4 address manually, that address becomes the lookup target. The manual check does not send your traffic through a proxy.</p></article>
-      <article className="section-card"><CardHeading eyebrow="02 · LOOKUPS" title="Who receives lookup data?" /><ul className="privacy-list"><li><strong>IPWho.is</strong> receives the target IP for location and network-provider metadata.</li><li><strong>DNS services</strong> are queried for the target IP’s PTR record and SpamCop / DroneBL reputation zones.</li><li><strong>Cloudflare</strong> receives a small download request only when you explicitly run the browser speed test.</li></ul></article>
-      <article className="section-card"><CardHeading eyebrow="03 · STORAGE" title="Is scan history saved?" /><p className="section-copy">The application code does not write scan results to an app database or maintain a report history. Reports are generated from the result currently in your browser; downloading or printing a report is initiated by you.</p><p className="section-copy">The hosting platform and external providers may keep operational logs under their own retention policies. The app cannot control those policies.</p></article>
+      <article className="section-card"><CardHeading eyebrow="01 · INPUT" title="Which IP is checked?" /><p className="section-copy">By default, the server checks the IPv4 address forwarded for the current request. If you enter an IPv4 address manually, that address becomes the lookup target. The manual check does not send your traffic through a proxy. The GeoIP source does not provide an accuracy radius, so these coordinates are not GPS and cannot verify a customer’s home or street.</p></article>
+      <article className="section-card"><CardHeading eyebrow="02 · LOOKUPS" title="Who receives lookup data?" /><ul className="privacy-list"><li><strong>IPWho.is</strong> receives the target IP for location and network-provider metadata.</li><li><strong>DNS services</strong> are queried for the target IP’s PTR record and SpamCop / DroneBL reputation zones.</li><li><strong><a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noreferrer">OpenStreetMap Nominatim</a></strong> receives coordinates rounded to 0.01° only when you choose “Look up nearest mapped area”. This request is not part of automatic polling. Review the <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noreferrer">usage policy</a>.</li><li><strong>Cloudflare</strong> receives a small download request only when you explicitly run the browser speed test.</li></ul><p className="section-copy">The public Nominatim service has a strict usage policy. This app caches results and limits lookups; high-volume use needs a separately hosted or quota-based provider.</p></article>
+      <article className="section-card"><CardHeading eyebrow="03 · STORAGE" title="Is scan history saved?" /><p className="section-copy">The application does not write IP addresses or reports to an app database and does not maintain a report history. The approximate area lookup response is cached for up to 24 hours using rounded coordinates to reduce repeat requests.</p><p className="section-copy">The hosting platform and external providers may keep operational logs under their own retention policies. The app cannot control those policies.</p></article>
       <article className="section-card"><CardHeading eyebrow="04 · CONTROL" title="What can you choose?" /><ul className="privacy-list"><li>Use the automatic current-IP check or enter an IPv4 address for a manual lookup.</li><li>Run the browser speed test only when you choose to.</li><li>Do not enter proxy credentials, passwords, tokens or other secrets; this tool does not need them.</li></ul></article>
     </div>
     <p className="section-footnote">The dashboard refreshes the selected IP check periodically while the page is open. Public reputation data can be incomplete, delayed or inaccurate.</p>
@@ -191,7 +251,7 @@ function EmptyState({ title, description }: { title: string; description: string
 
 function formatCoordinates(latitude?: number, longitude?: number) {
   if (typeof latitude !== "number" || typeof longitude !== "number") return "Unavailable";
-  return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+  return `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
 }
 
 function formatUtc(value: string) {

@@ -9,6 +9,25 @@ const DNSBLS = [
   { name: "DroneBL", zone: "dnsbl.dronebl.org" },
 ];
 
+type ApproximateArea = {
+  areaLabel: string | null;
+  neighborhood: string | null;
+  locality: string | null;
+  region: string | null;
+  country: string | null;
+  accuracyRadiusMeters: null;
+  coordinateRounding: "0.01 degree";
+  source: "OpenStreetMap Nominatim";
+  attributionUrl: "https://www.openstreetmap.org/copyright";
+};
+
+const areaCache = new Map<string, { expiresAt: number; value: ApproximateArea }>();
+const areaLookupsInFlight = new Map<string, Promise<ApproximateArea>>();
+const AREA_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_AREA_CACHE_ENTRIES = 500;
+const MIN_NOMINATIM_INTERVAL_MS = 1_100;
+let lastNominatimRequestAt = 0;
+
 function getClientIp(request: NextRequest) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const real = request.headers.get("x-real-ip")?.trim();
@@ -62,6 +81,138 @@ function classifyIpType(connectionType?: string, provider = "") {
   }
 
   return { category: "Unknown" as const, confidence: "low" as const };
+}
+
+function firstAddressValue(address: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = address[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+async function lookupApproximateArea(latitude: number, longitude: number): Promise<ApproximateArea> {
+  // Coarsen the IP-derived coordinates before sending them to the geocoder.
+  const roundedLatitude = Number(latitude.toFixed(2));
+  const roundedLongitude = Number(longitude.toFixed(2));
+  const cacheKey = `${roundedLatitude},${roundedLongitude}`;
+  const now = Date.now();
+  const cached = areaCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.value;
+  if (cached) areaCache.delete(cacheKey);
+
+  const activeLookup = areaLookupsInFlight.get(cacheKey);
+  if (activeLookup) return activeLookup;
+  if (now - lastNominatimRequestAt < MIN_NOMINATIM_INTERVAL_MS) {
+    throw new Error("NOMINATIM_RATE_LIMIT");
+  }
+  lastNominatimRequestAt = now;
+
+  const lookup = (async () => {
+    const endpoint = process.env.NOMINATIM_REVERSE_URL?.trim() || "https://nominatim.openstreetmap.org/reverse";
+    const url = new URL(endpoint);
+    url.searchParams.set("lat", String(roundedLatitude));
+    url.searchParams.set("lon", String(roundedLongitude));
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("zoom", "14");
+    url.searchParams.set("layer", "address");
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://checker-ip-version-0-0-1.vercel.app";
+    const response = await fetch(url, {
+      cache: "force-cache",
+      next: { revalidate: 86_400 },
+      headers: {
+        "User-Agent": `IP-Sentinel/0.0.1 (+${siteUrl}/)`,
+        Referer: `${siteUrl}/`,
+        "Accept-Language": "id,en",
+      },
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!response.ok) throw new Error("NOMINATIM_UNAVAILABLE");
+
+    const payload = await response.json() as { address?: Record<string, unknown> };
+    const address = payload.address || {};
+    const neighborhood = firstAddressValue(address, ["neighbourhood", "suburb", "city_district", "quarter", "borough"]);
+    const locality = firstAddressValue(address, ["city", "town", "village", "municipality", "county"]);
+    const region = firstAddressValue(address, ["state", "region", "state_district"]);
+    const country = firstAddressValue(address, ["country"]);
+    const areaLabel = [...new Set([neighborhood, locality, region, country].filter((part): part is string => Boolean(part)))].join(", ") || null;
+
+    return {
+      areaLabel,
+      neighborhood,
+      locality,
+      region,
+      country,
+      accuracyRadiusMeters: null,
+      coordinateRounding: "0.01 degree" as const,
+      source: "OpenStreetMap Nominatim" as const,
+      attributionUrl: "https://www.openstreetmap.org/copyright" as const,
+    };
+  })();
+
+  areaLookupsInFlight.set(cacheKey, lookup);
+  try {
+    const value = await lookup;
+    if (areaCache.size >= MAX_AREA_CACHE_ENTRIES) {
+      const oldestKey = areaCache.keys().next().value;
+      if (oldestKey) areaCache.delete(oldestKey);
+    }
+    areaCache.set(cacheKey, { expiresAt: Date.now() + AREA_CACHE_TTL_MS, value });
+    return value;
+  } finally {
+    areaLookupsInFlight.delete(cacheKey);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0].trim();
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+  const requestHost = forwardedHost || request.headers.get("host") || request.nextUrl.host;
+  const requestProtocol = forwardedProto || request.nextUrl.protocol.replace(":", "");
+  let sameOrigin = false;
+  try {
+    const originUrl = new URL(origin || "");
+    sameOrigin = originUrl.host.toLowerCase() === requestHost.toLowerCase() && originUrl.protocol === `${requestProtocol}:`;
+  } catch {
+    sameOrigin = false;
+  }
+  if (!sameOrigin) {
+    return NextResponse.json({ error: "Area lookup must be requested from this dashboard." }, { status: 403 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    body = null;
+  }
+
+  const latitude = typeof body === "object" && body !== null && "latitude" in body ? body.latitude : undefined;
+  const longitude = typeof body === "object" && body !== null && "longitude" in body ? body.longitude : undefined;
+  if (typeof latitude !== "number" || typeof longitude !== "number" ||
+      !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return NextResponse.json({ error: "Valid latitude and longitude are required." }, { status: 400 });
+  }
+
+  try {
+    const area = await lookupApproximateArea(latitude, longitude);
+    return NextResponse.json({ area, lookup: "user-triggered" });
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOMINATIM_RATE_LIMIT") {
+      return NextResponse.json(
+        { error: "Please wait a moment before requesting another area lookup." },
+        { status: 429, headers: { "Retry-After": "2" } },
+      );
+    }
+    return NextResponse.json(
+      { error: "Area lookup is temporarily unavailable. Please try again later." },
+      { status: 502 },
+    );
+  }
 }
 
 export async function GET(request: NextRequest) {

@@ -7,6 +7,7 @@ IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik IP yang terlih
 - Live polling setiap 30 detik.
 - Health score 0–100 berbasis sinyal publik.
 - Deteksi lokasi dan provider melalui IPWho.is.
+- Lookup area terdekat berbasis koordinat GeoIP melalui OpenStreetMap Nominatim hanya setelah pengguna menekan tombol.
 - Estimasi tipe IP **Residential**, **Mobile**, **Datacenter**, atau **Unknown** beserta tingkat keyakinannya.
 - Reverse DNS melalui resolver server.
 - Pemeriksaan SpamCop dan DroneBL melalui DNSBL.
@@ -46,7 +47,7 @@ npm run start
 2. Pilih **Add New Project**.
 3. Import repository `bangke1212/Checker_IP_version_0.0.1`.
 4. Framework akan terdeteksi sebagai Next.js.
-5. Tidak ada environment variable wajib.
+5. Tidak ada environment variable wajib. `NOMINATIM_REVERSE_URL` dapat diarahkan ke endpoint kompatibel untuk mengganti layanan; `NEXT_PUBLIC_SITE_URL` mengatur identitas URL pada header provider.
 6. Klik **Deploy**.
 
 Jika repository masih menggunakan nama lama atau project berada di GitHub lain, pilih repository yang sesuai dengan branch `main`.
@@ -66,6 +67,12 @@ Demo ini tidak memiliki database dan tidak menyimpan IP di server aplikasi. Prov
 DNSBL bukan sumber kebenaran tunggal. False positive, rate limit, resolver failure, dan perbedaan reputasi antar-provider tetap mungkin terjadi.
 
 Tipe IP adalah estimasi dari metadata koneksi/provider yang tersedia. Nilai `Unknown` berarti sumber data belum memberi sinyal yang cukup; kategori tersebut bukan verifikasi pasti jenis koneksi fisik.
+
+## Reverse-geocoding area
+
+Reverse-geocoding tidak berjalan saat polling IP setiap 30 detik. Pengguna harus menekan **Look up nearest mapped area** di IP Intelligence. Koordinat dibulatkan ke 0,01° sebelum dikirim ke Nominatim; UI hanya menyusun nama lingkungan/wilayah administratif dan tidak menampilkan jalan atau nomor rumah. Radius akurasi GeoIP tidak tersedia, sehingga hasil tidak boleh dianggap sebagai GPS atau alamat pelanggan.
+
+Respons di-cache hingga 24 jam dan request diberi identitas aplikasi serta atribusi OpenStreetMap. Server publik Nominatim membatasi penggunaan maksimal satu request per detik untuk seluruh aplikasi dan mengizinkan penggunaan langsung yang moderat; polling periodik atau trafik tinggi memerlukan provider berkuota atau instance sendiri. Baca [kebijakan penggunaan Nominatim](https://operations.osmfoundation.org/policies/nominatim/). `NOMINATIM_REVERSE_URL` dapat diarahkan ke endpoint Nominatim-compatible lain; batas cache lokal per-instance bukan rate limiter global untuk banyak instance.
 
 ## Struktur
 
