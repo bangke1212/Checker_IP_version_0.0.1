@@ -243,6 +243,7 @@ export async function GET(request: NextRequest) {
   const ipType = classifyIpType(connection?.type, `${connection?.org || ""} ${connection?.isp || ""}`);
   const listed = blacklists.filter((item) => item.status === "checked" && item.listed).length;
   const score = Math.max(0, 100 - listed * 35);
+  const threatScore = 100 - score;
 
   return NextResponse.json({
     checkedAt: new Date().toISOString(),
@@ -252,6 +253,7 @@ export async function GET(request: NextRequest) {
     blacklists,
     ipType,
     score,
+    threatScore,
     status: listed > 0 ? "review" : "healthy",
     source: requestedIp ? "manual" : "client",
     caveat:

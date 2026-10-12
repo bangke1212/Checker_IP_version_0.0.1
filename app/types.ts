@@ -24,6 +24,7 @@ export type CheckResult = {
   blacklists: { name: string; listed: boolean; status: string }[];
   ipType: { category: "Residential" | "Mobile" | "Datacenter" | "Unknown"; confidence: "high" | "medium" | "low" };
   score: number;
+  threatScore: number;
   status: "healthy" | "review";
   source?: "client" | "manual";
   caveat: string;
