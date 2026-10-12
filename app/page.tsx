@@ -1,42 +1,22 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import NetworkGlobe from "./network-globe";
+import { IntelligenceSection, PrivacySection, ReportsSection, ToolsSection } from "./dashboard-sections";
+import type { CheckResult, SpeedResult } from "./types";
 
-type ConnectionInfo = {
-  isp?: string;
-  org?: string;
-  asn?: number;
-  type?: string;
-};
-
-type GeoInfo = {
-  city?: string;
-  region?: string;
-  country?: string;
-  country_code?: string;
-  latitude?: number;
-  longitude?: number;
-  timezone?: { id?: string; utc?: string };
-  connection?: ConnectionInfo;
-} | null;
-
-type CheckResult = {
-  checkedAt: string;
-  clientIp: string;
-  reverseDns: string | null;
-  geo: GeoInfo;
-  blacklists: { name: string; listed: boolean; status: string }[];
-  ipType: { category: "Residential" | "Mobile" | "Datacenter" | "Unknown"; confidence: "high" | "medium" | "low" };
-  score: number;
-  status: "healthy" | "review";
-  source?: "client" | "manual";
-  caveat: string;
-};
-
-type SpeedResult = { mbps: number; latencyMs: number; bytes: number };
+type SectionId = "overview" | "ip-intelligence" | "tools" | "reports" | "privacy";
+const sections: { id: SectionId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "ip-intelligence", label: "IP Intelligence" },
+  { id: "tools", label: "Tools" },
+  { id: "reports", label: "Reports" },
+  { id: "privacy", label: "Privacy" },
+];
 
 export default function Home() {
+  const [activeSection, setActiveSection] = useState<SectionId>("overview");
   const [result, setResult] = useState<CheckResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,6 +26,20 @@ export default function Home() {
   const [speedLoading, setSpeedLoading] = useState(false);
   const [searchIp, setSearchIp] = useState("");
   const [targetIp, setTargetIp] = useState("");
+
+  useEffect(() => {
+    const syncSectionFromUrl = () => {
+      const requested = window.location.hash.slice(1);
+      setActiveSection(sections.find((section) => section.id === requested)?.id || "overview");
+    };
+    syncSectionFromUrl();
+    window.addEventListener("popstate", syncSectionFromUrl);
+    window.addEventListener("hashchange", syncSectionFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncSectionFromUrl);
+      window.removeEventListener("hashchange", syncSectionFromUrl);
+    };
+  }, []);
 
   const checkIp = useCallback(async () => {
     setLoading(true);
@@ -80,6 +74,13 @@ export default function Home() {
     setTargetIp("");
   };
 
+  const navigateToSection = (section: SectionId) => {
+    if (section === activeSection) return;
+    setActiveSection(section);
+    window.history.pushState({ section }, "", `#${section}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const runSpeedTest = async () => {
     setSpeedLoading(true);
     setSpeed(null);
@@ -108,6 +109,21 @@ export default function Home() {
     }
   };
 
+  const downloadReport = () => {
+    if (!result) return;
+    const report = {
+      product: "IP/Sentinel",
+      exportedAt: new Date().toISOString(),
+      ...result,
+    };
+    const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `ip-sentinel-${result.clientIp}-${Date.now()}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  };
+
   const location = useMemo(() => {
     if (!result?.geo) return "Location unavailable";
     return [result.geo.city, result.geo.region, result.geo.country].filter(Boolean).join(", ");
@@ -128,17 +144,19 @@ export default function Home() {
   return (
     <main className="app-shell" id="overview">
       <header className="topbar">
-        <a className="brand" href="#overview" aria-label="IP Sentinel home">
+        <a className="brand" href="#overview" aria-label="IP Sentinel home" onClick={(event) => { event.preventDefault(); navigateToSection("overview"); }}>
           <span className="brand-gem" aria-hidden="true"><span /></span>
           <span>IP<span className="brand-slash">/</span>SENTINEL</span>
         </a>
 
         <nav className="main-nav" aria-label="Main navigation">
-          <a className="nav-link active" href="#overview">Overview</a>
-          <a className="nav-link" href="#ip-intelligence">IP Intelligence</a>
-          <a className="nav-link" href="#tools">Tools</a>
-          <a className="nav-link" href="#reports">Reports</a>
-          <a className="nav-link" href="#privacy">Privacy</a>
+          {sections.map((section) => <button
+            className={`nav-link ${activeSection === section.id ? "active" : ""}`}
+            key={section.id}
+            type="button"
+            aria-current={activeSection === section.id ? "page" : undefined}
+            onClick={() => navigateToSection(section.id)}
+          >{section.label}</button>)}
         </nav>
 
         <div className="topbar-right">
@@ -172,7 +190,8 @@ export default function Home() {
 
       {error && <div className="notice" role="alert">{error}</div>}
 
-      <section className="primary-grid" id="ip-intelligence" aria-label="IP intelligence overview">
+      {activeSection === "overview" && <>
+      <section className="primary-grid" aria-label="IP health, geolocation and organization overview">
         <article className={`panel health-panel ${result?.status === "review" ? "is-review" : ""}`}>
           <PanelTitle icon={<ShieldIcon />} label="IP HEALTH" />
           <div className="health-content">
@@ -227,7 +246,7 @@ export default function Home() {
         </article>
       </section>
 
-      <section className="signals-grid" id="reports" aria-label="IP reputation and connection signals">
+      <section className="signals-grid" aria-label="IP reputation and connection signals">
         <article className="panel reputation-overview">
           <PanelTitle icon={<ShieldIcon />} label="REPUTATION" menu />
           <span className="data-label">DNSBL</span>
@@ -256,7 +275,7 @@ export default function Home() {
           <span className="small-caption mono-truncate" title={result?.reverseDns || ""}>{result?.reverseDns || (result ? "No reverse DNS record" : "Waiting for result")}</span>
         </article>
 
-        <article className="panel speed-panel" id="tools">
+        <article className="panel speed-panel">
           <PanelTitle icon={<SpeedIcon />} label="BROWSER SPEED" menu />
           <div className="speed-readout">
             <strong>{speed ? speed.mbps : "—"}<span> Mbps</span></strong>
@@ -283,8 +302,23 @@ export default function Home() {
           </button>
         </article>
       </section>
+      </>}
 
-      <footer className="footer" id="privacy">
+      {activeSection === "ip-intelligence" && <IntelligenceSection result={result} />}
+      {activeSection === "tools" && <ToolsSection
+        result={result}
+        speed={speed}
+        speedLoading={speedLoading}
+        searchIp={searchIp}
+        onSearchChange={setSearchIp}
+        onSearchSubmit={submitSearch}
+        onResetSearch={resetSearch}
+        onRunSpeedTest={runSpeedTest}
+      />}
+      {activeSection === "reports" && <ReportsSection result={result} onDownload={downloadReport} onPrint={() => window.print()} />}
+      {activeSection === "privacy" && <PrivacySection />}
+
+      <footer className="footer">
         <span className="footer-brand">IP<span>/</span>SENTINEL</span>
         <span>Public signals only · IP data is not persisted by this demo.</span>
         <span className="footer-live"><span />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Awaiting first check"}</span>
