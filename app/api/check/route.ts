@@ -82,6 +82,6 @@ export async function GET(request: NextRequest) {
     status: listed > 0 ? "review" : "healthy",
     source: requestedIp ? "manual" : "client",
     caveat:
-      "Hasil ini berdasarkan reputasi publik IP. Ini bukan pemeriksaan internal DAWN dan tidak menjamin kelayakan reward.",
+      "Hasil ini berdasarkan reputasi publik IP dan tidak menjamin kelayakan pada layanan pihak ketiga.",
   });
 }
