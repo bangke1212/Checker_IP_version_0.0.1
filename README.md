@@ -10,9 +10,19 @@ IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik IP yang terlih
 - Estimasi tipe IP **Residential**, **Mobile**, **Datacenter**, atau **Unknown** beserta tingkat keyakinannya.
 - Reverse DNS melalui resolver server.
 - Pemeriksaan SpamCop dan DroneBL melalui DNSBL.
-- Form **Check a proxy IP** untuk memeriksa IPv4 proxy publik secara manual.
+- Form IP lookup manual untuk memeriksa metadata IPv4 pilihan.
 - Tes speed ringan dari browser melalui Cloudflare Speed endpoint.
+- Navigasi **Overview**, **IP Intelligence**, **Tools**, **Reports**, dan **Privacy** dengan konten berbeda.
+- Laporan hasil scan terkini dapat dicetak/disimpan sebagai PDF dari browser atau diunduh sebagai JSON; tidak ada arsip histori di server.
 - Tidak meminta password, cookie, token, seed phrase, atau kredensial DAWN.
+
+## Bagian dashboard
+
+- **Overview** merangkum IP aktif, kesehatan, lokasi, organisasi, reputasi, reverse DNS, dan hasil tes browser.
+- **IP Intelligence** menampilkan rincian metadata dan status tiap sumber reputasi untuk IP yang dipilih.
+- **Tools** menyediakan lookup IPv4 manual dan tes koneksi browser.
+- **Reports** membuat ekspor dari hasil scan saat ini; laporan tidak otomatis disimpan sebagai histori.
+- **Privacy** menjelaskan pemrosesan IP oleh aplikasi serta lookup ke provider eksternal.
 
 ## Jalankan lokal
 
@@ -62,9 +72,11 @@ Tipe IP adalah estimasi dari metadata koneksi/provider yang tersedia. Nilai `Unk
 ```text
 app/
 ├── api/check/route.ts   # Serverless IP, DNSBL, dan metadata
+├── dashboard-sections.tsx # Konten IP Intelligence, Tools, Reports, dan Privacy
 ├── globals.css          # Visual system
 ├── layout.tsx           # Metadata dan root layout
-└── page.tsx             # Live dashboard
+├── page.tsx             # Live dashboard dan navigasi bagian
+└── types.ts             # Tipe data bersama untuk hasil pemeriksaan
 public/
 └── manus-routes.json
 
