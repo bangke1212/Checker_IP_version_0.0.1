@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FormEventHandler, ReactNode } from "react";
+import ThreatScoreChart from "./threat-score-chart";
 import type { CheckResult, SpeedResult } from "./types";
 
 type SectionProps = { result: CheckResult | null };
@@ -67,6 +68,8 @@ export function IntelligenceSection({ result }: SectionProps) {
       <MetricCard label="HEALTH SCORE" value={`${result.score} / 100`} detail={result.status === "review" ? "Review public signals" : "No listed signal detected"} />
       <MetricCard label="AUTONOMOUS SYSTEM" value={result.geo?.connection?.asn ? `AS${result.geo.connection.asn}` : "Unavailable"} detail={result.geo?.connection?.org || "Organization unavailable"} />
     </div>
+
+    <ThreatScoreChart result={result} />
 
     <div className="section-card-grid">
       <article className="section-card">

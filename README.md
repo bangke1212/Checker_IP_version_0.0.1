@@ -5,7 +5,7 @@ IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik IP yang terlih
 ## Fitur
 
 - Live polling setiap 30 detik.
-- Health score 0–100 berbasis sinyal publik.
+- Health score dan threat score 0–100 berdasarkan sinyal DNSBL publik yang dikonfigurasi.
 - Deteksi lokasi dan provider melalui IPWho.is.
 - Lookup area terdekat berbasis koordinat GeoIP melalui OpenStreetMap Nominatim hanya setelah pengguna menekan tombol.
 - Estimasi tipe IP **Residential**, **Mobile**, **Datacenter**, atau **Unknown** beserta tingkat keyakinannya.
@@ -20,7 +20,7 @@ IP/Sentinel adalah dashboard live untuk memeriksa reputasi publik IP yang terlih
 ## Bagian dashboard
 
 - **Overview** merangkum IP aktif, kesehatan, lokasi, organisasi, reputasi, reverse DNS, dan hasil tes browser.
-- **IP Intelligence** menampilkan rincian metadata dan status tiap sumber reputasi untuk IP yang dipilih.
+- **IP Intelligence** menampilkan rincian metadata, threat score, grafik kontribusi tiap sumber DNSBL, dan status cakupan untuk IP yang dipilih.
 - **Tools** menyediakan lookup IPv4 manual dan tes koneksi browser.
 - **Reports** membuat ekspor dari hasil scan saat ini; laporan tidak otomatis disimpan sebagai histori.
 - **Privacy** menjelaskan pemrosesan IP oleh aplikasi serta lookup ke provider eksternal.
@@ -67,6 +67,10 @@ Demo ini tidak memiliki database dan tidak menyimpan IP di server aplikasi. Prov
 DNSBL bukan sumber kebenaran tunggal. False positive, rate limit, resolver failure, dan perbedaan reputasi antar-provider tetap mungkin terjadi.
 
 Tipe IP adalah estimasi dari metadata koneksi/provider yang tersedia. Nilai `Unknown` berarti sumber data belum memberi sinyal yang cukup; kategori tersebut bukan verifikasi pasti jenis koneksi fisik.
+
+## Threat score
+
+Threat score adalah kebalikan dari health score (`100 - health score`). Setiap listing DNSBL terkonfirmasi menambah 35 poin; hasil hanya mencerminkan sumber DNSBL yang dikonfigurasi dan merespons. Jika cakupan parsial, sumber yang tidak tersedia tidak dianggap bersih. Grafik IP Intelligence adalah snapshot scan saat ini, bukan tren historis atau probabilitas menyeluruh bahwa IP melakukan penyalahgunaan; aplikasi tidak menyimpan histori scan.
 
 ## Reverse-geocoding area
 
